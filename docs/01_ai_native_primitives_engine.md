@@ -36,7 +36,7 @@ I needed a **Domain Specific Language**.
 *   **Expressiveness**: It can combine these blocks orthogonally (Trend + Logic + Risk).
 *   **Visual**: Because it's structured data (JSON), I can build a [visual editor](https://www.myinvestpilot.com/primitives-editor) (a quick visual demo) to verify AI output instantly.
 
-## 3. The Engineering Muscle: Schema Supply Chain
+## 3. The Engineering Muscle: Schema & Architecture
 
 The real magic isn't just the DSL; it's how we teach the AI to use it. In MyInvestPilot, the **Schema is the Source of Truth**.
 
@@ -48,21 +48,45 @@ graph LR
     Generator --> CI["CI Publish Job"]
     CI --> Public["R2 Public Schema URL"]
 
-    Public --> AIService["AI Generation Service\n(response_format json_schema)"]
-    Public --> WebForm["Web Strategy Form\n(AJV validation)"]
+    Public --> AIService["AI Generation Service<br/>(response_format json_schema)"]
+    Public --> WebForm["Web Strategy Form<br/>(AJV validation)"]
     Public --> Editor["Visual/JSON Editor"]
     Public --> PromptArtifact["LLM Quickstart Artifact"]
 ```
 
-1.  **Auto-Generated Prompts**: The [Quickstart Guide](https://www.myinvestpilot.com/docs/primitives/_llm/llm-quickstart.txt) (publicly viewable) is generated from the schema during the build. No drift between the engine and the AI's instruction manual.
+1.  **Auto-Generated Prompts**: The [Quickstart Guide](https://www.myinvestpilot.com/docs/primitives/_llm/llm-quickstart.txt) (publicly viewable) is generated from the same schema used for validation. No drift between the engine and the AI's instruction manual.
 2.  **Layered Validation**:
     *   **Layer A (Front-End)**: AJV compiles the schema to catch structural errors instantly.
     *   **Layer B (Back-End)**: Service-side validators ensure strict type safety.
-    *   **Layer C (Semantic)**: Custom logic checks for domain rules (e.g., "Fundamental metrics must match point-in-time constraints").
+    *   **Layer C (Today + Target)**: Today we run targeted consistency guards (for example, fundamental input consistency and market dependency checks). A standalone semantic validator stage is the next step.
 
 This turns the LLM from a "creative writer" into a **reliable compiler frontend**.
 
 This pipeline turns the schema into a shared contract between humans, AI, and the execution engine.
+
+The complete JSON Schema defining all primitives is publicly available: [https://media.i365.tech/myinvestpilot/primitives_schema.json](https://media.i365.tech/myinvestpilot/primitives_schema.json). It is the single source of truth for primitive-strategy IR validation, prompt generation, and editor rendering.
+
+### Runtime Validation Architecture (Current vs Target)
+
+While the supply chain builds the contract, runtime behavior is currently schema-first:
+
+```mermaid
+graph TD
+    Agent["AI Agent"] -->|Generates| JSON["DSL JSON Fragment"]
+
+    JSON --> Schema["Schema Validator - Implemented"]
+    Schema -->|Valid| Pipeline["Portfolio Pipeline - Implemented<br/>Full portfolio_config snapshot execution"]
+    Schema -->|Invalid| Error["Validation Errors"]
+
+    Pipeline --> Logs["Execution Logs / Diagnostics - Implemented"]
+    Logs -->|Manual or assisted iteration| Agent
+
+    Schema -.-> Semantic["Semantic Validator - Roadmap<br/>PIT, data availability, frequency alignment"]
+    Semantic -.->|Invalid| Error
+    Error -.->|Constrained Repair Loop - Roadmap| Agent
+```
+
+Today, semantic verification is not yet a standalone runtime stage. It is handled by targeted guards plus engine diagnostics.
 
 ## 4. The Solution: Orthogonal Primitives & Validation
 
@@ -160,6 +184,13 @@ The true power of this architecture is that it makes AI a **Strategy Architect**
 4.  **Verification**: The [visual editor](https://www.myinvestpilot.com/primitives-editor) renders the JSON as immediate feedback.
 
 This loop—Input -> JSON -> Visual Verification -> Execution—is the **Holy Grail of AI UX**. It transforms the AI from a chatbot into a reliable tool for building complex systems. Although built for investment decision logic, this pattern applies to any constrained decision system.
+
+### Core Design Principles
+
+1.  **Constrain generation at the source**, don't fix errors downstream.
+2.  **Verify before execution** (Schema checks first, then targeted semantic guards).
+3.  **Separate intent (AI)** from **deterministic execution (engine)**.
+4.  **Prioritize reproducibility** over incremental efficiency.
 
 ## 7. Join the Discussion
 
