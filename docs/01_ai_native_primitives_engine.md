@@ -1,4 +1,4 @@
-# From Open-Source Quant Libs to AI-Native Engines: Why I Built a DSL for Investment
+# From Rule-Based Scripts to AI-Native Engines: Why I Built a Constrained DSL
 
 ## 1. The Builder's Journey
 
@@ -6,58 +6,27 @@ Hi, I'm Dawei ([@madawei2699](https://github.com/madawei2699)), an independent b
 
 Now, through MyInvestPilot, I'm exploring how to make LLMs truly reliable for composing complex, verifiable decision logic. Whether you're in quant trading, AI agents, or building constrained decision systems, I hope this resonates.
 
-## 2. The Secret Sauce: Schema-Driven, Auto-Generated Prompt Engineering
+My journey didn't start with a desire to build a DSL. It started with **pain**.
 
-The real magic isn't just the DSL; it's how we teach the AI to use it.
+`invest-alchemy` was my first attempt: a library for scheduled, rule-based trading tasks. It worked great for me, but when I tried to let AI (Agents) use it, it fell apart. The AI would hallucinate libraries, write infinite loops, or create strategies that looked correct but were financially dangerous (look-ahead bias).
 
-I treat the System Prompt as **software**, not text. The [Quickstart Guide](https://www.myinvestpilot.com/docs/primitives/_llm/llm-quickstart.txt) (publicly viewable – feel free to study how it enforces DAGs, strict typing, and PIT rules) is **auto-generated from the JSON Schema** during the build process.
+I realized that **General-purpose code is too unconstrained for reliable AI-driven decision systems.** Code is too broad. It allows *anything* to happen.
 
-*   **Versioned & Synced**: When I add a new primitive (e.g., `CryptoSentiment`), the schema updates, and the prompt automatically includes it. No drift between the engine and the AI's instruction manual.
-*   **Mental Model Enforcement**: It explicitly forces the AI to think in **DAGs (Directed Acyclic Graphs)**, not procedural code. It warns against common hallucinations (like inline definitions) with "❌ WRONG / ✅ CORRECT" examples.
-*   **Domain Constraints**: It enforces strictly point-in-time correctness for fundamental data, preventing the AI from accidentally creating look-ahead bias.
+To build a truly AI-Native system, I needed a **General Decision Engine** that separates *Intent* from *Execution*.
 
-This turns the LLM from a "creative writer" into a **reliable compiler frontend**.
+## 2. The Core Decision: Why Not Just Fix the Code?
 
-## 3. The Builder's Journey
-
-My journey didn't start with a business plan; it started with code. I spent years building `invest-alchemy` for developers, but I hit a wall: **The barrier to sophisticated decision-making was still too high.**
-
-When ChatGPT arrived, I saw an opportunity. But I also saw a problem.
-
-## 4. The Bottleneck: The "Python Trap"
-
-In my current project (a systematic investment platform called MyInvestPilot), I needed a way for users—and AI—to define complex strategies.
-
-The standard playbook was: **Python scripts**.
-*   **Safety**: How do I stop a user's code from crashing my server or stealing data?
-*   **Complexity**: Most users aren't engineers. They understand "Golden Cross," not `pandas.DataFrame`.
-*   **AI Mutation**: I tried letting GPT-3.5 write these Python strategies. It was a disaster. It would hallucinate libraries, write infinite loops, or use future data (look-ahead bias).
-
-I realized that **Code is not the right interface for AI-driven decisions.** Code is too broad. It allows *anything* to happen.
-
-To build a truly AI-Native system, I needed a **General Decision Engine**.
-
-## 5. The Exploration: Why Not Code or APIs?
-
-I didn't start with a DSL. In fact, DSLs are hard to build. I wanted the simplest solution that would allow AI (Agents) to build strategies for users.
-
-I evaluated three paths:
+I evaluated three paths to make AI reliable:
 
 ### Path A: Code Generation + Sandbox (The "Natural" Choice)
-The most obvious idea: *Just let the AI write Python code and run it in a secure Sandbox (Docker/Wasm).*
-*   **Pros**: Infinite flexibility. AI knows Python well.
-*   **Cons**:
-    *   **Hallucination**: The AI imports libraries that don't exist. It writes `while True` loops that hang the sandbox.
-    *   **Safety**: Even with a sandbox, malicious logic (like infinite resource consumption) is hard to contain.
-    *   **Maintenance**: When the AI writes a bug, the user can't fix it because they don't know Python.
+The most obvious idea: *Just let the AI write Python code and run it in a secure Sandbox.*
+*   **Pros**: Infinite flexibility.
+*   **Cons**: **Hallucination & Safety**. Even with a sandbox, malicious logic (like infinite resource consumption) is hard to contain. And when the AI writes a bug, the user can't fix it because they don't know Python.
 
 ### Path B: The "Super API" (REST/GraphQL)
 The standard SaaS approach: *Build a massive API endpoint where users config params.*
-*   `POST /create-strategy { "ma_period": 20, "rsi_threshold": 30 ... }`
 *   **Pros**: Safe. Easy to validate.
-*   **Cons**:
-    *   **Parameter Explosion**: To support "RSI > 30 AND (MA50 > MA200 OR Volume > 1M)", the API parameters became a nightmare of nested objects.
-    *   **Logic Limits**: You can't easily express *logic* (If-This-Then-That) in a standard REST payload without inventing a clumsy JSON structure anyway.
+*   **Cons**: **Parameter Explosion**. To support "RSI > 30 AND (MA50 > MA200 OR Volume > 1M)", the API parameters became a nightmare of nested objects.
 
 ### Path C: The Decision (DSL)
 I realized I needed the **Safety of an API** but the **Expressiveness of Code**.
@@ -65,18 +34,41 @@ I needed a **Domain Specific Language**.
 
 *   **Constraint**: The AI can only use valid "Primitives" (LEGO blocks). It cannot import `os` or `sys`.
 *   **Expressiveness**: It can combine these blocks orthogonally (Trend + Logic + Risk).
-*   **Visual**: Because it's structured data (JSON), I can build a [visual editor](https://www.myinvestpilot.com/primitives-editor) (a quick visual demo I built for instant verification) to verify AI output instantly.
+*   **Visual**: Because it's structured data (JSON), I can build a [visual editor](https://www.myinvestpilot.com/primitives-editor) (a quick visual demo) to verify AI output instantly.
 
-## 6. The Solution: Orthogonal Primitives (Investment IR)
+## 3. The Engineering Muscle: Schema Supply Chain
 
-This engine treats investment not as a script, but as a configuration of **Orthogonal Truths**:
-*   **Trend**: Where is the market going? (SMA, EMA)
-*   **Value**: Is it cheap? (RSI, PE_TTM)
-*   **Quality**: Is the asset healthy? (ROE, Cashflow)
+The real magic isn't just the DSL; it's how we teach the AI to use it. In MyInvestPilot, the **Schema is the Source of Truth**.
 
-By combining these atomic units, we can express infinite complexity without writing code.
+We don't manually write prompts. We have a **Schema Supply Chain**:
 
-### Validation: A Multi-Factor Risk Strategy
+```mermaid
+graph LR
+    Engine["investStrategyService"] --> Generator["Schema Generator"]
+    Generator --> CI["CI Publish Job"]
+    CI --> Public["R2 Public Schema URL"]
+
+    Public --> AIService["AI Generation Service\n(response_format json_schema)"]
+    Public --> WebForm["Web Strategy Form\n(AJV validation)"]
+    Public --> Editor["Visual/JSON Editor"]
+    Public --> PromptArtifact["LLM Quickstart Artifact"]
+```
+
+1.  **Auto-Generated Prompts**: The [Quickstart Guide](https://www.myinvestpilot.com/docs/primitives/_llm/llm-quickstart.txt) (publicly viewable) is generated from the schema during the build. No drift between the engine and the AI's instruction manual.
+2.  **Layered Validation**:
+    *   **Layer A (Front-End)**: AJV compiles the schema to catch structural errors instantly.
+    *   **Layer B (Back-End)**: Service-side validators ensure strict type safety.
+    *   **Layer C (Semantic)**: Custom logic checks for domain rules (e.g., "Fundamental metrics must match point-in-time constraints").
+
+This turns the LLM from a "creative writer" into a **reliable compiler frontend**.
+
+This pipeline turns the schema into a shared contract between humans, AI, and the execution engine.
+
+## 4. The Solution: Orthogonal Primitives & Validation
+
+This engine treats investment not as a script, but as a configuration of **Orthogonal Truths**.
+
+### Case Study: Fundamental Risk Control
 
 To validate this engine, I implemented a complex multi-factor risk model. This isn't a toy example; it demonstrates how the DSL handles technical trend following, fundamental health checks, and dynamic position sizing in a single declarative graph.
 
@@ -109,37 +101,16 @@ To validate this engine, I implemented a complex multi-factor risk model. This i
     ],
     "signals": [
       // 1. Technical Trend
-      {
-        "id": "trend_up",
-        "type": "GreaterThan",
-        "inputs": [{ "ref": "ema_fast" }, { "ref": "ema_slow" }]
-      },
+      { "id": "trend_up", "type": "GreaterThan", "inputs": [{ "ref": "ema_fast" }, { "ref": "ema_slow" }] },
       // 2. Fundamental Gates
-      {
-        "id": "roe_ok",
-        "type": "GreaterThan",
-        "inputs": [{ "ref": "roe_metric" }, { "ref": "roe_min" }]
-      },
-      {
-        "id": "debt_ok",
-        "type": "LessThan",
-        "inputs": [{ "ref": "debt_metric" }, { "ref": "debt_max" }]
-      },
-      {
-        "id": "cashflow_ok",
-        "type": "GreaterThan",
-        "inputs": [{ "ref": "cashflow_metric" }, { "ref": "cashflow_min" }]
-      },
+      { "id": "roe_ok", "type": "GreaterThan", "inputs": [{ "ref": "roe_metric" }, { "ref": "roe_min" }] },
+      { "id": "debt_ok", "type": "LessThan", "inputs": [{ "ref": "debt_metric" }, { "ref": "debt_max" }] },
+      { "id": "cashflow_ok", "type": "GreaterThan", "inputs": [{ "ref": "cashflow_metric" }, { "ref": "cashflow_min" }] },
       // 3. Combine Logic (AND)
       {
         "id": "risk_gate",
         "type": "And",
-        "inputs": [
-          { "ref": "trend_up" },
-          { "ref": "roe_ok" },
-          { "ref": "debt_ok" },
-          { "ref": "cashflow_ok" }
-        ]
+        "inputs": [ { "ref": "trend_up" }, { "ref": "roe_ok" }, { "ref": "debt_ok" }, { "ref": "cashflow_ok" } ]
       },
       // 4. Dynamic Position Sizing based on Debt
       {
@@ -167,24 +138,30 @@ To validate this engine, I implemented a complex multi-factor risk model. This i
 }
 ```
 
-This configuration is **Stateless** and **Declarative**.
-The engine doesn't know *how* to calculate EMA; it just knows *that* it needs an EMA. This separation allows us to optimize the engine (using Rust, columnar data, etc.) without breaking user strategies.
+This configuration is **Stateless** and **Declarative**. The engine doesn't know *how* to calculate EMA; it just knows *that* it needs an EMA. This separation allows us to optimize the engine (using Rust, columnar data, etc.) without breaking user strategies. The engine executes strategies deterministically using a full configuration snapshot, ensuring reproducibility and auditability.
 
-## 7. Why This Matters for AI
+## 5. Reality Check: Where Code Strategies Still Win
 
-The true power of this DSL is that it makes AI a **Strategy Architect**.
+DSL is not a religion. It is an honest engineering trade-off.
 
-If we used Python, the AI would be a "Coder"—and a bad one at that. It would make syntax errors.
-But with DSL, the AI is constrained to a **Schema**. It can only combine valid blocks.
+The engine actually supports **Two Strategy Paths**:
+1.  **Primitive DSL path**: For composable, stateless logic (90% of AI use cases).
+2.  **Code strategy path**: For complex stateful patterns (e.g., sector rotation).
+
+We keep both because forcing everything into a DSL leads to "DSL Hell" (opaque code in disguise). A dual-path model keeps the system honest: **DSL for Intent** (AI-friendly), **Code for Complexity** (Human-managed).
+
+## 6. Why This Matters for AI
+
+The true power of this architecture is that it makes AI a **Strategy Architect**.
 
 1.  **User Prompt**: "Help me build a conservative strategy."
-2.  **System Prompt**: It is fed the [AI Quickstart Guide](https://www.myinvestpilot.com/docs/primitives/_llm/llm-quickstart.txt) (a prompt template I use to guide the LLM) as context.
-3.  **AI Output**: Generates valid JSON (like above).
-4.  **Verification**: The [visual editor](https://www.myinvestpilot.com/primitives-editor) (a quick visual demo I built for instant verification) renders the JSON as immediate feedback.
+2.  **System Prompt**: Fed the auto-generated [Quickstart Guide](https://www.myinvestpilot.com/docs/primitives/_llm/llm-quickstart.txt).
+3.  **AI Output**: Generates valid JSON.
+4.  **Verification**: The [visual editor](https://www.myinvestpilot.com/primitives-editor) renders the JSON as immediate feedback.
 
-This loop—Input -> JSON -> Visual Verification -> Execution—is the **Holy Grail of AI UX**. It transforms the AI from a chatbot into a reliable tool for building complex systems.
+This loop—Input -> JSON -> Visual Verification -> Execution—is the **Holy Grail of AI UX**. It transforms the AI from a chatbot into a reliable tool for building complex systems. Although built for investment decision logic, this pattern applies to any constrained decision system.
 
-## 8. Join the Discussion
+## 7. Join the Discussion
 
 This is just one piece of how I'm approaching AI-native systems. My GitHub ([github.com/madawei2699](https://github.com/madawei2699)) has related explorations in LLM agents and workflows.
 
