@@ -37,6 +37,14 @@ Why we split Local Agent (flexible orchestration) and Remote Agent (deterministi
 
 How a multi-vendor, async-first, serverless-friendly stack supports real usage with low operational cost.
 
+## Blog Publication
+
+A synthesized version of this series was published on the author's blog:
+
+**[How I Built an AI-Native Quantitative System](https://www.bmpi.dev/dev/ai-native-investment-system/)** — bmpi.dev
+
+This post distills the key architectural decisions across all four parts: constrained DSL design, schema supply chain, prompt evolution, and the hybrid agent paradox.
+
 ## Audience
 
 This repo is for builders working on:

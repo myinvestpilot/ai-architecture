@@ -43,6 +43,14 @@
 
 讲清楚多 vendor、EDA、队列驱动扩缩容和 serverless 友好设计如何共同支撑低成本运行。
 
+## 博客发布版
+
+本系列的综合整理版已发布在作者博客：
+
+**[我是如何构建一个 AI 原生量化系统的](https://www.bmpi.dev/dev/ai-native-investment-system/)** — bmpi.dev
+
+这篇文章提炼了四个部分的核心架构决策：受约束 DSL 设计、Schema 供应链、Prompt 演化历程，以及混合 Agent 架构的设计取舍。
+
 ## 适合谁看
 
 如果你正在做这些方向，这个仓库会更有价值：
